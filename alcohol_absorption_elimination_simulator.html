@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alcohol Absorption & Elimination Educational Simulator</title>
+  <!-- Favicon: SVG data-uri featuring a stylized bell curve with a glowing peak dot -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f172a'/><path d='M4 26 Q12 26 16 12 Q20 26 28 26' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round'/><circle cx='16' cy='12' r='3.5' fill='%236366f1'/></svg>">
+  
+  <!-- PWA Manifest & Theme -->
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" id="dynamicManifest">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 1); }
+    /* Allow native vertical scrolling while keeping pointer handling managed via JS */
+    #bacChart {
+      touch-action: pan-y;
+      outline: none;
+    }
+    #bacChart:focus {
+      outline: 2px solid rgba(59, 130, 246, 0.8);
+      outline-offset: 4px;
+      border-radius: 8px;
+    }
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      display: none;
+      appearance: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen py-6 px-3 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="text-center space-y-3">
+      <div class="max-w-4xl mx-auto text-yellow-300 text-sm sm:text-base">
+        <b>NOT FOR MEDICAL, LEGAL, OR DRIVING DECISIONS.</b>
+        This simplified simulation cannot measure or reliably predict an individual's actual BAC, impairment, or time to become safe to drive. Do not use its output to decide whether to drive. If you've been drinking, use a sober ride.
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- Input Panel (Left Column on Desktop) -->
+      <section id="panelInputs" class="lg:col-span-4 bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 sm:p-5 shadow-xl space-y-5">
+        <div class="space-y-4">
+
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">User Details</h2>
+
+          <!-- User Details (Exposed Form Card) -->
+          <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-3.5 space-y-2.5 transition">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-300 uppercase tracking-wider mb-1" for="bodyWeight">Weight (lbs)</label>
+                <input type="number" id="bodyWeight" value="200" step="1" min="50" max="700" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" oninput="updateCalculations();">
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-300 uppercase tracking-wider mb-1" for="genderFactor">Sex</label>
+                <select id="genderFactor" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" onchange="updateCalculations();">
+                  <option value="male" selected>Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-400">The presets are illustrative assumptions, not individualized physiological measurements.</p>
+          </div>
+
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">Drinks consumed</h2>
+
+          <!-- Drink Preset Card with Integrated Edit Toggle -->
+          <div class="bg-slate-900 border border-slate-700/80 rounded-xl overflow-hidden transition">
+            <div class="flex items-stretch bg-slate-900 h-[52px]">
+              <div id="presetsButtonGroup" class="flex-1 flex items-stretch min-w-0"></div>
+              <button type="button" onclick="togglePresetAccordion()" class="w-12 bg-slate-800 hover:bg-blue-600/20 text-slate-300 hover:text-blue-400 flex items-center justify-center transition border-l border-slate-700/80 shrink-0" title="Edit preset configuration">
+                <svg id="presetAccordionChevron" class="w-4 h-4 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              </button>
+            </div>
+            <div id="presetAccordionBody" class="p-3.5 space-y-3 bg-slate-950/60 border-t border-slate-800 hidden">
+              <div class="grid grid-cols-12 gap-2">
+                <div class="col-span-6">
+                  <label class="block text-[10px] font-semibold text-slate-300 uppercase tracking-wider mb-1">Name</label>
+                  <input type="text" id="editPresetLabel" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" oninput="updateActivePresetLive()">
+                </div>
+                <div class="col-span-3">
+                  <label class="block text-[10px] font-semibold text-slate-300 uppercase tracking-wider mb-1">Vol (oz)</label>
+                  <input type="number" id="editPresetVolume" step="0.5" min="0.1" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" oninput="updateActivePresetLive()">
+                </div>
+                <div class="col-span-3">
+                  <label class="block text-[10px] font-semibold text-slate-300 uppercase tracking-wider mb-1">ABV (%)</label>
+                  <input type="number" id="editPresetAbv" step="0.1" min="0.1" max="100" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" oninput="updateActivePresetLive()">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions: Add Next & Add Now -->
+          <div class="flex items-center gap-2 pt-1">
+            <button id="planDrinkBtn" onclick="addDrinkRow('plan')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-3 px-3 rounded-xl transition shadow-md">+ Add next</button>
+            <button id="addDrinkNowBtn" onclick="addDrinkRow('now')" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs py-3 px-3 rounded-xl transition shadow-md">+ Add now</button>
+          </div>
+
+          <!-- Drinks Consumed Section -->
+          <div class="space-y-2.5">
+            <div id="drinksListContainer" class="space-y-2.5"></div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- Graph & Stats Panel (Right Column on Desktop) -->
+      <section id="panelGraph" class="lg:col-span-8 bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col justify-between space-y-5">
+        
+        <!-- Metrics Dashboard Pods (Compact mobile row layout, vertical card stack on desktop) -->
+        <div class="space-y-2">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <!-- Simulated Peak Pod -->
+            <div class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch">
+              <span class="text-[9px] sm:text-[10px] text-indigo-300 font-extrabold uppercase tracking-widest text-left sm:text-center">Simulated Peak</span>
+              <div class="flex sm:block items-center gap-2 mt-0.5 sm:mt-1.5 text-right sm:text-center">
+                <span id="metricPeakCentral" class="block text-xs sm:text-sm font-black text-indigo-400 tracking-tight leading-tight">—</span>
+                <span id="metricPeakBounds" class="block text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-tight leading-tight">—</span>
+              </div>
+            </div>
+
+            <!-- Clear Range Pod (Interactive Toggle Button) -->
+            <div id="clearRangePod" onclick="toggleClearRangeDisplay()" class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch cursor-pointer hover:border-emerald-500 transition-all group" title="Click to toggle between time window and duration">
+              <span class="text-[9px] sm:text-[10px] text-emerald-300 font-extrabold uppercase tracking-widest text-left sm:text-center">Clear Range</span>
+              <div id="metricClearTime" class="flex sm:block items-center gap-2 mt-0.5 sm:mt-1.5 text-right sm:text-center">
+                <span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">—</span>
+              </div>
+            </div>
+
+            <!-- Total Volume Pod -->
+            <div class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch">
+              <span class="text-[9px] sm:text-[10px] text-blue-300 font-extrabold uppercase tracking-widest text-left sm:text-center">Total Volume</span>
+              <div class="flex sm:block items-center gap-1.5 mt-0.5 sm:mt-1.5 text-right sm:text-center">
+                <span id="metricStandardDrinks" class="block text-[11px] sm:text-xs font-black text-blue-400 tracking-tight leading-tight">0.0 Std Drinks</span>
+                <span class="block text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-tight">(14g)</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-[9px] text-slate-500 px-0.5">*Alcohol quantity estimate, not an impairment estimate.</p>
+        </div>
+
+        <!-- Panel Title -->
+        <div id="chartTopAnchor" class="border-b border-slate-700/80 pb-3">
+          <h2 class="text-lg font-bold text-white">Illustrative absorption / elimination curve</h2>
+        </div>
+
+        <!-- Legend at the top (Above Chart) with Themed, Vague Range Language -->
+        <div class="pb-3 border-b border-slate-700/60">
+          <div class="space-y-1.5 text-xs text-slate-300">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-3 h-3 rounded-full bg-amber-600/85 shrink-0"></span>
+              <div class="flex items-center space-x-2">
+                <span id="legendValUpper" class="font-bold text-white w-14 inline-block">0.000%</span>
+                <span class="text-slate-300"><b>Upper range boundary:</b> slower elimination estimate</span>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2.5">
+              <span class="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span>
+              <div class="flex items-center space-x-2">
+                <span id="legendValCentral" class="font-bold text-white w-14 inline-block">0.000%</span>
+                <span class="text-slate-300"><b>Middle baseline:</b> central model estimate</span>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2.5">
+              <span class="w-3 h-3 rounded-full bg-emerald-600/85 shrink-0"></span>
+              <div class="flex items-center space-x-2">
+                <span id="legendValLower" class="font-bold text-white w-14 inline-block">0.000%</span>
+                <span class="text-slate-300"><b>Lower range boundary:</b> faster elimination estimate</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart Canvas -->
+        <div class="relative w-full h-[360px] sm:h-[450px] my-2">
+          <canvas id="bacChart" tabindex="0"></canvas>
+        </div>
+
+        <!-- Chart Description at the bottom -->
+        <div class="pt-3 border-t border-slate-700/60">
+          <p class="text-xs text-slate-400">Model output only — not a breathalyzer result or a driving-clearance time. Model limitations: simplified, fixed absorption shape; uniform intake between entered start and finish times; fixed elimination assumptions; no food, medications, health conditions, drinking-pattern variability, or individual calibration. Actual impairment and BAC can differ substantially.</p>
+        </div>
+
+      </section>
+
+    </div>
+  </div>
+
+<script>
+  // --- Injected PWA Service Worker & Dynamic Manifest ---
+  (function initPWA() {
+    const manifestObj = {
+      name: "Alcohol Absorption & Elimination Educational Simulator",
+      short_name: "BAC Simulator",
+      start_url: window.location.href.split('?')[0],
+      display: "standalone",
+      background_color: "#0f172a",
+      theme_color: "#0f172a",
+      icons: [
+        {
+          src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='128' fill='%230f172a'/><path d='M64 416 Q256 416 320 192 Q384 416 448 416' fill='none' stroke='%233b82f6' stroke-width='48' stroke-linecap='round'/><circle cx='320' cy='192' r='56' fill='%236366f1'/></svg>",
+          sizes: "512x512",
+          type: "image/svg+xml"
+        }
+      ]
+    };
+    const manifestString = encodeURIComponent(JSON.stringify(manifestObj));
+    const manifestLink = document.getElementById('dynamicManifest');
+    if (manifestLink) {
+      manifestLink.setAttribute('href', 'data:application/manifest+json,' + manifestString);
+    }
+
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'bac-simulator-v1';
+        self.addEventListener('install', (e) => {
+          self.skipWaiting();
+        });
+        self.addEventListener('activate', (e) => {
+          e.waitUntil(clients.claim());
+        });
+        self.addEventListener('fetch', (e) => {
+          e.respondWith(
+            caches.match(e.request).then((cachedResponse) => {
+              return cachedResponse || fetch(e.request).catch(() => {
+                return caches.match('./');
+              });
+            })
+          );
+        });
+      `;
+      const blob = new Blob([swCode], { type: 'text/javascript' });
+      const swUrl = URL.createObjectURL(blob);
+      navigator.serviceWorker.register(swUrl).catch((err) => {
+        console.log('SW registration failed:', err);
+      });
+    }
+  })();
+
+  // --- Simulator Core Application Logic ---
+  let bacChartInstance = null;
+  let drinkCounter = 0;
+  const ABSORPTION_MINUTES = 45;
+  const MAX_SIMULATION_HOURS_AFTER_LAST_FINISH = 36;
+  const BAC_ZERO_THRESHOLD = 0.00001;
+
+  // Global state for Clear Range toggle ('time' vs 'duration')
+  let clearRangeDisplayMode = 'time';
+  let lastCalculatedClearData = { hasResult: false, durationStr: '—', clearTimeStr: '—' };
+
+  const DEFAULT_PRESETS = {
+    craft_beer: { label: 'Craft Beer', volume: 16, abv: 6.7 },
+    beer_can: { label: 'Beer Can', volume: 12, abv: 5.0 },
+    wine: { label: 'Wine', volume: 5, abv: 12.0 },
+    shot: { label: 'Shot', volume: 1.5, abv: 40.0 }
+  };
+
+  let presets = {};
+  let selectedPresetKey = 'craft_beer';
+
+  function loadPresets() {
+    try {
+      const saved = localStorage.getItem('bac_simulator_presets');
+      if (saved) {
+        presets = JSON.parse(saved);
+      } else {
+        presets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+      }
+    } catch (e) {
+      presets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+    }
+    if (!presets[selectedPresetKey]) {
+      selectedPresetKey = Object.keys(presets)[0] || 'craft_beer';
+    }
+    renderPresetsUI();
+    loadActivePresetIntoInputs();
+  }
+
+  function savePresetsToStorage() {
+    try {
+      localStorage.setItem('bac_simulator_presets', JSON.stringify(presets));
+    } catch (e) {}
+  }
+
+  function selectPresetGroup(key) {
+    if (presets[key]) {
+      selectedPresetKey = key;
+      renderPresetsUI();
+      loadActivePresetIntoInputs();
+    }
+  }
+
+  function loadActivePresetIntoInputs() {
+    const p = presets[selectedPresetKey];
+    if (!p) return;
+    document.getElementById('editPresetLabel').value = p.label;
+    document.getElementById('editPresetVolume').value = p.volume;
+    document.getElementById('editPresetAbv').value = p.abv;
+  }
+
+  function updateActivePresetLive() {
+    const label = document.getElementById('editPresetLabel').value.trim();
+    const volume = Number(document.getElementById('editPresetVolume').value);
+    const abv = Number(document.getElementById('editPresetAbv').value);
+
+    if (selectedPresetKey && presets[selectedPresetKey] && label && volume > 0 && abv > 0) {
+      presets[selectedPresetKey] = { label, volume, abv };
+      savePresetsToStorage();
+      renderPresetsUI();
+    }
+  }
+
+  function renderPresetsUI() {
+    const container = document.getElementById('presetsButtonGroup');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const keys = Object.keys(presets);
+    keys.forEach((key) => {
+      const p = presets[key];
+      const isSelected = key === selectedPresetKey;
+      
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.onclick = () => selectPresetGroup(key);
+      
+      btn.className = `flex-1 px-1.5 py-1 text-left transition flex flex-col justify-center min-w-0 border-r border-slate-700/80 ${
+        isSelected 
+          ? 'bg-blue-600 text-white font-semibold' 
+          : 'bg-slate-900 text-slate-300 hover:bg-slate-800/80'
+      }`;
+      
+      btn.innerHTML = `
+        <span class="block text-[11px] font-bold leading-tight truncate text-slate-100">${p.label}</span>
+        <span class="block text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-400'} leading-tight truncate mt-0.5">${p.volume}oz | ${p.abv}%</span>
+      `;
+      container.appendChild(btn);
+    });
+  }
+
+  function togglePresetAccordion() {
+    const body = document.getElementById('presetAccordionBody');
+    const chevron = document.getElementById('presetAccordionChevron');
+    if (!body) return;
+    body.classList.toggle('hidden');
+    chevron.classList.toggle('rotate-45');
+    if (!body.classList.contains('hidden')) {
+      loadActivePresetIntoInputs();
+    }
+  }
+
+  function localTimeString(date) {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+
+  function handleDrinkStartChange(id) {
+    const row = document.getElementById(`drinkRow_${id}`);
+    if (!row) return;
+    const startInput = row.querySelector('.drink-start');
+    const finishInput = row.querySelector('.drink-finish');
+
+    if (!startInput || !finishInput || !startInput.value) return;
+
+    if (row._prevStartVal && row._prevFinishVal) {
+      const [psH, psM] = row._prevStartVal.split(':').map(Number);
+      const [pfH, pfM] = row._prevFinishVal.split(':').map(Number);
+      let psMins = psH * 60 + psM;
+      let pfMins = pfH * 60 + pfM;
+      if (pfMins < psMins) pfMins += 1440;
+      const durationMins = pfMins - psMins;
+
+      const [nsH, nsM] = startInput.value.split(':').map(Number);
+      let nsMins = nsH * 60 + nsM;
+      let nfMins = nsMins + durationMins;
+
+      const nfH = Math.floor((nfMins % 1440) / 60);
+      const nfM = nfMins % 60;
+      finishInput.value = `${String(nfH).padStart(2, '0')}:${String(nfM).padStart(2, '0')}`;
+    }
+
+    row._prevStartVal = startInput.value;
+    row._prevFinishVal = finishInput.value;
+
+    updateCalculations();
+  }
+
+  function handleDrinkFinishChange(id) {
+    const row = document.getElementById(`drinkRow_${id}`);
+    if (!row) return;
+    const startInput = row.querySelector('.drink-start');
+    const finishInput = row.querySelector('.drink-finish');
+
+    if (startInput && finishInput && startInput.value && finishInput.value) {
+      if (startInput.value > finishInput.value) {
+        finishInput.value = startInput.value;
+      }
+    }
+    if (row && finishInput) {
+      row._prevStartVal = startInput ? startInput.value : '';
+      row._prevFinishVal = finishInput.value;
+    }
+    updateCalculations();
+  }
+
+  function addDrinkRow(mode = 'plan', customData = {}) {
+    const now = new Date();
+    const rows = [...document.querySelectorAll('#drinksListContainer > div')];
+    
+    const activePreset = presets[selectedPresetKey] || DEFAULT_PRESETS.craft_beer;
+    let defaultStart, defaultFinish;
+    let defaultVolume = customData.volume ?? activePreset.volume;
+    let defaultAbv = customData.abv ?? activePreset.abv;
+    let defaultPresetName = customData.presetName ?? activePreset.label;
+    let lastDurationMinutes = 30;
+
+    if (mode === 'clone' && customData.sourceRowId) {
+      const sourceRow = document.getElementById(`drinkRow_${customData.sourceRowId}`);
+      if (sourceRow) {
+        defaultStart = sourceRow.querySelector('.drink-start').value;
+        defaultFinish = sourceRow.querySelector('.drink-finish').value;
+        defaultVolume = Number(sourceRow.querySelector('.drink-vol').value) || defaultVolume;
+        defaultAbv = Number(sourceRow.querySelector('.drink-abv').value) || defaultAbv;
+        defaultPresetName = sourceRow.querySelector('.drink-name').value || defaultPresetName;
+      }
+    } else {
+      if (rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
+        const lastStartVal = lastRow.querySelector('.drink-start').value;
+        const lastFinishVal = lastRow.querySelector('.drink-finish').value;
+
+        if (lastStartVal && lastFinishVal) {
+          const [sH, sM] = lastStartVal.split(':').map(Number);
+          const [fH, fM] = lastFinishVal.split(':').map(Number);
+          let sMins = sH * 60 + sM;
+          let fMins = fH * 60 + fM;
+          if (fMins < sMins) fMins += 1440;
+          const dur = fMins - sMins;
+          if (dur > 0) lastDurationMinutes = dur;
+        }
+
+        if (mode === 'plan') {
+          defaultStart = lastFinishVal || localTimeString(now);
+        } else {
+          defaultStart = localTimeString(now);
+        }
+      } else {
+        defaultStart = localTimeString(now);
+      }
+
+      if (mode === 'plan' && rows.length > 0) {
+        const [dsH, dsM] = defaultStart.split(':').map(Number);
+        let totalFinishMins = dsH * 60 + dsM + lastDurationMinutes;
+        const finH = Math.floor((totalFinishMins % 1440) / 60);
+        const finM = totalFinishMins % 60;
+        defaultFinish = `${String(finH).padStart(2, '0')}:${String(finM).padStart(2, '0')}`;
+      } else {
+        const finishDefault = new Date(now.getTime() + 30 * 60000);
+        defaultFinish = localTimeString(finishDefault);
+      }
+    }
+
+    drinkCounter++;
+    const id = drinkCounter;
+    const card = document.createElement('div');
+    card.id = `drinkRow_${id}`;
+    card._prevStartVal = defaultStart;
+    card._prevFinishVal = defaultFinish;
+    card.className = "bg-slate-900 border border-slate-700/80 rounded-xl p-3 transition shadow-sm";
+    
+    card.innerHTML = `
+      <!-- Integrated Grid Layout: Inputs on left (col-span-10), Clone & Delete buttons neatly tucked on the right (col-span-2) -->
+      <div class="grid grid-cols-12 gap-2 items-center">
+        <!-- Inputs Container (Cols 1-10) -->
+        <div class="col-span-10 space-y-1.5">
+          <!-- Top Row: Name & Start -->
+          <div class="grid grid-cols-12 gap-1.5">
+            <div class="col-span-6 relative flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 focus-within:border-blue-500 transition">
+              <input type="text" value="${defaultPresetName}" class="drink-name bg-transparent text-xs font-bold text-white focus:outline-none w-full text-left" oninput="updateCalculations();" placeholder="Drink name">
+              <span class="text-[9px] font-bold text-slate-400 uppercase ml-1 shrink-0">Name</span>
+            </div>
+            <div class="col-span-6 relative flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-1.5 focus-within:border-blue-500 transition">
+              <input type="time" value="${defaultStart}" class="drink-start bg-transparent text-xs font-semibold text-blue-400 focus:outline-none w-full text-left" oninput="handleDrinkStartChange(${id});">
+              <span class="text-[9px] font-bold text-slate-400 uppercase ml-1 shrink-0">Start</span>
+            </div>
+          </div>
+
+          <!-- Bottom Row: Vol, ABV & End -->
+          <div class="grid grid-cols-12 gap-1.5">
+            <div class="col-span-3 relative flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 focus-within:border-blue-500 transition">
+              <input type="number" value="${defaultVolume}" step="0.5" min="0.1" class="drink-vol bg-transparent text-xs font-semibold text-white text-left focus:outline-none w-full" oninput="updateCalculations();">
+              <span class="text-[9px] font-bold text-slate-400 uppercase ml-1 shrink-0">OZ</span>
+            </div>
+            <div class="col-span-3 relative flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 focus-within:border-blue-500 transition">
+              <input type="number" value="${defaultAbv}" step="0.1" min="0.1" max="100" class="drink-abv bg-transparent text-xs font-semibold text-white text-left focus:outline-none w-full" oninput="updateCalculations();">
+              <span class="text-[9px] font-bold text-slate-400 uppercase ml-1 shrink-0">%</span>
+            </div>
+            <div class="col-span-6 relative flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-1.5 focus-within:border-blue-500 transition">
+              <input type="time" value="${defaultFinish}" class="drink-finish bg-transparent text-xs font-semibold text-slate-200 focus:outline-none w-full text-left" oninput="handleDrinkFinishChange(${id});">
+              <span class="text-[9px] font-bold text-slate-400 uppercase ml-1 shrink-0">End</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons Container (Cols 11-12) -->
+        <div class="col-span-2 flex flex-col justify-between gap-1.5 h-full min-h-[66px]">
+          <button type="button" onclick="cloneDrinkRow(${id})" class="flex-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded-lg flex items-center justify-center transition" title="Clone drink">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+          </button>
+          <button type="button" onclick="removeDrinkRow(${id})" class="flex-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/40 rounded-lg flex items-center justify-center transition" title="Delete drink">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="drink-error text-[10px] text-rose-300 hidden pt-1"></p>
+    `;
+    document.getElementById('drinksListContainer').appendChild(card);
+    updateCalculations();
+  }
+
+  function cloneDrinkRow(id) {
+    const row = document.getElementById(`drinkRow_${id}`);
+    if (!row) return;
+    addDrinkRow('clone', { sourceRowId: id });
+  }
+
+  function removeDrinkRow(id) {
+    document.getElementById(`drinkRow_${id}`)?.remove();
+    updateCalculations();
+  }
+
+  function getDrinksData() {
+    const rows = [...document.querySelectorAll('#drinksListContainer > div')];
+    const rawDrinks = [];
+    let hasError = false;
+
+    rows.forEach((row, index) => {
+      const error = row.querySelector('.drink-error');
+      if (error) {
+        error.classList.add('hidden');
+        error.textContent = '';
+      }
+
+      const startValue = row.querySelector('.drink-start').value;
+      const finishValue = row.querySelector('.drink-finish').value;
+      const volumeOz = Number.parseFloat(row.querySelector('.drink-vol').value);
+      const abv = Number.parseFloat(row.querySelector('.drink-abv').value);
+
+      if (!startValue || !finishValue || !(volumeOz > 0) || !(abv > 0 && abv <= 100)) {
+        if (error) {
+          error.textContent = 'Enter valid start/finish times, positive volume, and ABV.';
+          error.classList.remove('hidden');
+        }
+        hasError = true;
+        return;
+      }
+
+      const [startH, startM] = startValue.split(':').map(Number);
+      const [finishH, finishM] = finishValue.split(':').map(Number);
+      const startClock = startH * 60 + startM;
+      const finishClock = finishH * 60 + finishM;
+
+      rawDrinks.push({
+        rowIndex: index,
+        startClock,
+        finishClock,
+        volumeOz,
+        abv,
+        ethanolGrams: volumeOz * 29.5735 * (abv / 100) * 0.789
+      });
+    });
+
+    if (hasError || rawDrinks.length === 0) {
+      return { drinks: [], hasError };
+    }
+
+    const drinks = [];
+    let dayOffset = 0;
+    let previousStartClock = null;
+
+    rawDrinks.forEach((d, index) => {
+      if (previousStartClock !== null) {
+        if (d.startClock < previousStartClock) {
+          dayOffset += 1440;
+        }
+      }
+      previousStartClock = d.startClock;
+
+      let startMinutes = d.startClock + dayOffset;
+      let finishMinutes = d.finishClock + dayOffset;
+
+      if (finishMinutes < startMinutes) {
+        finishMinutes += 1440;
+      }
+
+      drinks.push({
+        rowIndex: d.rowIndex,
+        startMinutes,
+        finishMinutes,
+        volumeOz: d.volumeOz,
+        abv: d.abv,
+        ethanolGrams: d.ethanolGrams
+      });
+    });
+
+    return { drinks, hasError };
+  }
+
+  function formatTimeFromMinutes(totalMinutes) {
+    const dayMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+    let hours = Math.floor(dayMinutes / 60);
+    const minutes = dayMinutes % 60;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours %= 12;
+    if (hours === 0) hours = 12;
+    return `${hours}:${String(minutes).padStart(2, '0')} ${ampm}`;
+  }
+
+  function absorptionFraction(ageMinutes) {
+    if (ageMinutes <= 0) return 0;
+    if (ageMinutes >= ABSORPTION_MINUTES) return 1;
+    const remaining = 1 - ageMinutes / ABSORPTION_MINUTES;
+    return 1 - remaining * remaining;
+  }
+
+  function simulateCurve(drinks, bodyWeightGrams, rFactor, betaRate, timelineStart, timelineEnd) {
+    const cohortLists = [];
+    const drinkSchedules = drinks.map(d => {
+      const duration = d.finishMinutes - d.startMinutes;
+      return {
+        ...d,
+        duration,
+        gramsPerMinute: duration > 0 ? d.ethanolGrams / duration : 0,
+        instantAdded: false
+      };
+    });
+
+    const samples = [];
+    let bac = 0;
+    let peak = 0;
+
+    for (let minute = timelineStart; minute <= timelineEnd; minute++) {
+      for (const drink of drinkSchedules) {
+        if (drink.duration === 0) {
+          if (!drink.instantAdded && minute === drink.startMinutes) {
+            cohortLists.push({ grams: drink.ethanolGrams, intakeMinute: minute });
+            drink.instantAdded = true;
+          }
+        } else if (minute >= drink.startMinutes && minute < drink.finishMinutes) {
+          cohortLists.push({ grams: drink.gramsPerMinute, intakeMinute: minute });
+        }
+      }
+
+      let newlyAbsorbedGrams = 0;
+      for (let i = cohortLists.length - 1; i >= 0; i--) {
+        const cohort = cohortLists[i];
+        const age = minute - cohort.intakeMinute;
+        const fractionNow = absorptionFraction(age);
+        const fractionNext = absorptionFraction(age + 1);
+        newlyAbsorbedGrams += cohort.grams * (fractionNext - fractionNow);
+        if (age >= ABSORPTION_MINUTES) cohortLists.splice(i, 1);
+      }
+
+      bac += (newlyAbsorbedGrams / (bodyWeightGrams * rFactor)) * 100;
+      bac = Math.max(0, bac - betaRate / 60);
+
+      if (bac > peak) peak = bac;
+      if ((minute - timelineStart) % 15 === 0) {
+        samples.push({ minute, bac });
+      }
+    }
+
+    return { samples, peak, finalBac: bac };
+  }
+
+  function findFirstZeroAfterLastFinish(samples, lastFinish) {
+    for (const sample of samples) {
+      if (sample.minute >= lastFinish && sample.bac <= BAC_ZERO_THRESHOLD) {
+        return sample.minute;
+      }
+    }
+    return null;
+  }
+
+  function updateLegendValues(upperVal = null, centralVal = null, lowerVal = null) {
+    document.getElementById('legendValUpper').textContent = upperVal !== null ? `${upperVal.toFixed(3)}%` : '0.000%';
+    document.getElementById('legendValCentral').textContent = centralVal !== null ? `${centralVal.toFixed(3)}%` : '0.000%';
+    document.getElementById('legendValLower').textContent = lowerVal !== null ? `${lowerVal.toFixed(3)}%` : '0.000%';
+  }
+
+  const verticalLinePlugin = {
+    id: 'verticalLinePlugin',
+    afterDraw(chart) {
+      if (chart.tooltip?._active && chart.tooltip._active.length) {
+        const ctx = chart.ctx;
+        const activePoint = chart.tooltip._active[0];
+        const x = activePoint.element.x;
+        const topY = chart.scales.y.top;
+        const bottomY = chart.scales.y.bottom;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, topY);
+        ctx.lineTo(x, bottomY);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#facc15';
+        ctx.stroke();
+
+        const labelText = chart.data.labels[activePoint.index];
+        if (labelText) {
+          ctx.font = 'bold 10px Inter, sans-serif';
+          const textWidth = ctx.measureText(labelText).width;
+          const paddingX = 6;
+          const boxWidth = textWidth + paddingX * 2;
+          const boxHeight = 18;
+          
+          const minX = chart.chartArea.left;
+          const maxX = chart.chartArea.right - boxWidth;
+          const boxX = Math.max(minX, Math.min(maxX, x - boxWidth / 2));
+          const boxY = Math.max(2, topY - boxHeight - 4);
+
+          ctx.fillStyle = '#facc15';
+          ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+
+          ctx.fillStyle = '#0f172a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(labelText, boxX + boxWidth / 2, boxY + boxHeight / 2);
+        }
+
+        ctx.restore();
+      }
+    }
+  };
+
+  function renderClearRangePodContent() {
+    const clearTimeContainer = document.getElementById('metricClearTime');
+    if (!lastCalculatedClearData.hasResult) {
+      clearTimeContainer.innerHTML = `<span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">—</span>`;
+      return;
+    }
+
+    if (clearRangeDisplayMode === 'time') {
+      clearTimeContainer.innerHTML = `
+        <span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">${lastCalculatedClearData.clearTimeStr}</span>
+      `;
+    } else {
+      clearTimeContainer.innerHTML = `
+        <span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">${lastCalculatedClearData.durationStr}</span>
+      `;
+    }
+  }
+
+  function toggleClearRangeDisplay() {
+    clearRangeDisplayMode = clearRangeDisplayMode === 'time' ? 'duration' : 'time';
+    renderClearRangePodContent();
+  }
+
+  function updateCalculations() {
+    const { drinks, hasError } = getDrinksData();
+    const weight = Number.parseFloat(document.getElementById('bodyWeight').value);
+    const preset = document.getElementById('genderFactor').value;
+
+    if (hasError || !Number.isFinite(weight) || weight < 50 || weight > 700) {
+      document.getElementById('metricPeakCentral').textContent = '—';
+      document.getElementById('metricPeakBounds').textContent = '—';
+      lastCalculatedClearData = { hasResult: false };
+      renderClearRangePodContent();
+      renderChart([], [], [], []);
+      updateLegendValues();
+      return;
+    }
+
+    if (drinks.length === 0) {
+      document.getElementById('metricStandardDrinks').textContent = '0.0 Std Drinks';
+      document.getElementById('metricPeakCentral').textContent = '—';
+      document.getElementById('metricPeakBounds').textContent = '—';
+      lastCalculatedClearData = { hasResult: false };
+      renderClearRangePodContent();
+      renderChart([], [], [], []);
+      updateLegendValues();
+      return;
+    }
+
+    const totalEthanolGrams = drinks.reduce((sum, drink) => sum + drink.ethanolGrams, 0);
+    document.getElementById('metricStandardDrinks').textContent = `${(totalEthanolGrams / 14).toFixed(1)} Std Drinks`;
+
+    const rUpper = preset === 'female' ? 0.49 : 0.60;
+    const rCentral = preset === 'female' ? 0.55 : 0.68;
+    const rLower = preset === 'female' ? 0.63 : 0.76;
+    const betaUpper = 0.012;
+    const betaCentral = 0.015;
+    const betaLower = 0.018;
+
+    const firstStart = Math.min(...drinks.map(d => d.startMinutes));
+    const lastFinish = Math.max(...drinks.map(d => d.finishMinutes));
+    const timelineStart = firstStart - 60;
+    const timelineEnd = lastFinish + MAX_SIMULATION_HOURS_AFTER_LAST_FINISH * 60;
+    const bodyWeightGrams = weight * 453.592;
+
+    const upper = simulateCurve(drinks, bodyWeightGrams, rUpper, betaUpper, timelineStart, timelineEnd);
+    const central = simulateCurve(drinks, bodyWeightGrams, rCentral, betaCentral, timelineStart, timelineEnd);
+    const lower = simulateCurve(drinks, bodyWeightGrams, rLower, betaLower, timelineStart, timelineEnd);
+
+    const peakCentral = central.peak;
+    const peakLowBound = lower.peak;
+    const peakHighBound = upper.peak;
+
+    document.getElementById('metricPeakCentral').textContent = `${peakCentral.toFixed(3)}%`;
+    document.getElementById('metricPeakBounds').textContent = `(${peakLowBound.toFixed(3)}% – ${peakHighBound.toFixed(3)}%)`;
+
+    const zeroMinuteUpper = findFirstZeroAfterLastFinish(upper.samples, lastFinish);
+    const zeroMinuteLower = findFirstZeroAfterLastFinish(lower.samples, lastFinish);
+
+    if (zeroMinuteUpper === null || zeroMinuteLower === null) {
+      lastCalculatedClearData = {
+        hasResult: true,
+        durationStr: '>36h range',
+        clearTimeStr: '>36h range'
+      };
+    } else {
+      const fastDiffMins = zeroMinuteLower - firstStart;
+      const slowDiffMins = zeroMinuteUpper - firstStart;
+      
+      const fastHrs = Math.floor(fastDiffMins / 60);
+      const fastMins = fastDiffMins % 60;
+      const slowHrs = Math.floor(slowDiffMins / 60);
+      const slowMins = slowDiffMins % 60;
+
+      const durationStr = `${fastHrs}h ${fastMins}m – ${slowHrs}h ${slowMins}m`;
+      const clearTimeStr = `${formatTimeFromMinutes(zeroMinuteLower)} – ${formatTimeFromMinutes(zeroMinuteUpper)}`;
+      
+      lastCalculatedClearData = {
+        hasResult: true,
+        durationStr,
+        clearTimeStr
+      };
+    }
+
+    renderClearRangePodContent();
+
+    const displayEnd = zeroMinuteUpper === null
+      ? timelineEnd
+      : Math.min(timelineEnd, zeroMinuteUpper + 60);
+
+    const makeDisplay = result => result.samples.filter(s => s.minute <= displayEnd);
+    const upperDisplay = makeDisplay(upper);
+    const centralDisplay = makeDisplay(central);
+    const lowerDisplay = makeDisplay(lower);
+
+    const labels = upperDisplay.map(s => formatTimeFromMinutes(s.minute));
+    renderChart(
+      labels,
+      upperDisplay.map(s => Number(s.bac.toFixed(4))),
+      centralDisplay.map(s => Number(s.bac.toFixed(4))),
+      lowerDisplay.map(s => Number(s.bac.toFixed(4))),
+      central.samples,
+      peakHighBound,
+      peakCentral,
+      peakLowBound
+    );
+  }
+
+  function renderChart(labels, upperData, centralData, lowerData, centralSamples, peakHighBound, peakCentral, peakLowBound) {
+    const canvas = document.getElementById('bacChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const ctx = canvas.getContext('2d');
+    if (bacChartInstance) bacChartInstance.destroy();
+
+    let isPointerDown = false;
+
+    bacChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Upper range boundary',
+            data: upperData,
+            borderColor: 'rgba(217, 119, 6, 0.7)',
+            borderWidth: 1.5,
+            borderDash: [3, 4],
+            fill: false,
+            tension: 0.25,
+            pointRadius: 0,
+            pointHoverRadius: 5
+          },
+          {
+            label: 'Middle baseline',
+            data: centralData,
+            borderColor: '#3b82f6',
+            borderWidth: 2.5,
+            fill: '-1',
+            backgroundColor: 'rgba(59, 130, 246, 0.07)',
+            tension: 0.25,
+            pointRadius: 0,
+            pointHoverRadius: 6
+          },
+          {
+            label: 'Lower range boundary',
+            data: lowerData,
+            borderColor: 'rgba(16, 185, 129, 0.7)',
+            borderWidth: 1.5,
+            borderDash: [3, 4],
+            fill: false,
+            tension: 0.25,
+            pointRadius: 0,
+            pointHoverRadius: 5
+          }
+        ]
+      },
+      plugins: [verticalLinePlugin],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        events: ['click'],
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: false,
+            external: function(context) {
+              const tooltipModel = context.tooltip;
+              if (!tooltipModel || tooltipModel.opacity === 0 || !tooltipModel.dataPoints) {
+                return;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+            ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { family: 'Inter', size: 10 } }
+          },
+          y: {
+            min: 0,
+            suggestedMax: 0.12,
+            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { family: 'Inter', size: 10 },
+              callback: value => Number(value).toFixed(2) + '%'
+            }
+          }
+        }
+      }
+    });
+
+    const activatePointAtEvent = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+      
+      const chartPoint = { x: clientX - rect.left, y: clientY - rect.top };
+
+      const points = bacChartInstance.getElementsAtEventForMode({
+        type: 'click',
+        native: e,
+        x: chartPoint.x,
+        y: chartPoint.y
+      }, 'index', { intersect: false }, true);
+
+      if (points.length) {
+        const firstPoint = points[0];
+        bacChartInstance.setActiveElements(points);
+        if (bacChartInstance.tooltip) {
+          bacChartInstance.tooltip.setActiveElements(points, { x: firstPoint.element.x, y: firstPoint.element.y });
+        }
+        bacChartInstance.update();
+
+        const upperVal = bacChartInstance.data.datasets[0].data[firstPoint.index] ?? 0;
+        const centralVal = bacChartInstance.data.datasets[1].data[firstPoint.index] ?? 0;
+        const lowerVal = bacChartInstance.data.datasets[2].data[firstPoint.index] ?? 0;
+        updateLegendValues(upperVal, centralVal, lowerVal);
+      }
+    };
+
+    canvas.onpointerdown = (e) => {
+      if (document.activeElement === canvas) {
+        isPointerDown = true;
+        canvas.setPointerCapture(e.pointerId);
+        activatePointAtEvent(e);
+      }
+    };
+
+    canvas.onpointermove = (e) => {
+      if (!isPointerDown || document.activeElement !== canvas) return;
+      activatePointAtEvent(e);
+    };
+
+    const endPointerDrag = (e) => {
+      if (isPointerDown) {
+        isPointerDown = false;
+        try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
+    };
+
+    canvas.onpointerup = endPointerDrag;
+    canvas.onpointercancel = endPointerDrag;
+
+    // Initialize legend values directly to the exact peak values of each respective curve to match the pod
+    updateLegendValues(peakHighBound, peakCentral, peakLowBound);
+  }
+
+  window.addDrinkRow = addDrinkRow;
+  window.cloneDrinkRow = cloneDrinkRow;
+  window.removeDrinkRow = removeDrinkRow;
+  window.updateCalculations = updateCalculations;
+  window.selectPresetGroup = selectPresetGroup;
+  window.togglePresetAccordion = togglePresetAccordion;
+  window.updateActivePresetLive = updateActivePresetLive;
+  window.handleDrinkStartChange = handleDrinkStartChange;
+  window.handleDrinkFinishChange = handleDrinkFinishChange;
+  window.toggleClearRangeDisplay = toggleClearRangeDisplay;
+
+  window.addEventListener('DOMContentLoaded', () => {
+    loadPresets();
+    document.getElementById('bodyWeight').addEventListener('input', updateCalculations);
+    document.getElementById('genderFactor').addEventListener('change', updateCalculations);
+    updateCalculations();
+  });
+</script>
+</body>
+</html>
