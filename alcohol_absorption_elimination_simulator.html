@@ -123,21 +123,22 @@
         <!-- Metrics Dashboard Pods (Compact mobile row layout, vertical card stack on desktop) -->
         <div class="space-y-2">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            
+            <!-- Estimated Time to Zero Pod (Interactive Toggle Button matching Simulated Peak pattern) -->
+            <div id="clearRangePod" onclick="toggleClearRangeDisplay()" class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch cursor-pointer hover:border-emerald-500 transition-all group" title="Click to toggle between clock time and duration">
+              <span class="text-[9px] sm:text-[10px] text-emerald-300 font-extrabold uppercase tracking-widest text-left sm:text-center">Est. Time to Zero</span>
+              <div id="metricClearTime" class="flex sm:block items-center gap-2 mt-0.5 sm:mt-1.5 text-right sm:text-center">
+                <span id="metricClearCentral" class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">—</span>
+                <span id="metricClearBounds" class="block text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-tight leading-tight">—</span>
+              </div>
+            </div>
+            
             <!-- Simulated Peak Pod -->
             <div class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch">
               <span class="text-[9px] sm:text-[10px] text-indigo-300 font-extrabold uppercase tracking-widest text-left sm:text-center">Simulated Peak</span>
               <div class="flex sm:block items-center gap-2 mt-0.5 sm:mt-1.5 text-right sm:text-center">
                 <span id="metricPeakCentral" class="block text-xs sm:text-sm font-black text-indigo-400 tracking-tight leading-tight">—</span>
                 <span id="metricPeakBounds" class="block text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-tight leading-tight">—</span>
-              </div>
-            </div>
-
-            <!-- Clear Range Pod (Interactive Toggle Button matching Simulated Peak pattern) -->
-            <div id="clearRangePod" onclick="toggleClearRangeDisplay()" class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch cursor-pointer hover:border-emerald-500 transition-all group" title="Click to toggle between clock time and duration">
-              <span class="text-[9px] sm:text-[10px] text-emerald-300 font-extrabold uppercase tracking-widest text-left sm:text-center">Clear Range</span>
-              <div id="metricClearTime" class="flex sm:block items-center gap-2 mt-0.5 sm:mt-1.5 text-right sm:text-center">
-                <span id="metricClearCentral" class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">—</span>
-                <span id="metricClearBounds" class="block text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-tight leading-tight">—</span>
               </div>
             </div>
 
@@ -149,6 +150,7 @@
                 <span class="block text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-tight">(14g)</span>
               </div>
             </div>
+
           </div>
           <p class="text-[9px] text-slate-500 px-0.5">*Alcohol quantity estimate, not an impairment estimate.</p>
         </div>
