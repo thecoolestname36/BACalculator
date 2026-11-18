@@ -132,11 +132,12 @@
               </div>
             </div>
 
-            <!-- Clear Range Pod (Interactive Toggle Button) -->
-            <div id="clearRangePod" onclick="toggleClearRangeDisplay()" class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch cursor-pointer hover:border-emerald-500 transition-all group" title="Click to toggle between time window and duration">
+            <!-- Clear Range Pod (Interactive Toggle Button matching Simulated Peak pattern) -->
+            <div id="clearRangePod" onclick="toggleClearRangeDisplay()" class="bg-gradient-to-b from-slate-900 to-slate-950 px-3 py-2 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-700/80 shadow-md flex sm:flex-col justify-between items-center sm:items-stretch cursor-pointer hover:border-emerald-500 transition-all group" title="Click to toggle between clock time and duration">
               <span class="text-[9px] sm:text-[10px] text-emerald-300 font-extrabold uppercase tracking-widest text-left sm:text-center">Clear Range</span>
               <div id="metricClearTime" class="flex sm:block items-center gap-2 mt-0.5 sm:mt-1.5 text-right sm:text-center">
-                <span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">—</span>
+                <span id="metricClearCentral" class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">—</span>
+                <span id="metricClearBounds" class="block text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-tight leading-tight">—</span>
               </div>
             </div>
 
@@ -259,7 +260,13 @@
 
   // Global state for Clear Range toggle ('time' vs 'duration')
   let clearRangeDisplayMode = 'time';
-  let lastCalculatedClearData = { hasResult: false, durationStr: '—', clearTimeStr: '—' };
+  let lastCalculatedClearData = {
+    hasResult: false,
+    centralTimeStr: '—',
+    boundsTimeStr: '—',
+    centralDurationStr: '—',
+    boundsDurationStr: '—'
+  };
 
   const DEFAULT_PRESETS = {
     craft_beer: { label: 'Craft Beer', volume: 16, abv: 6.7 },
@@ -628,6 +635,12 @@
     return `${hours}:${String(minutes).padStart(2, '0')} ${ampm}`;
   }
 
+  function formatDurationMinutes(diffMins) {
+    const hrs = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hrs}h ${mins}m`;
+  }
+
   function absorptionFraction(ageMinutes) {
     if (ageMinutes <= 0) return 0;
     if (ageMinutes >= ABSORPTION_MINUTES) return 1;
@@ -746,20 +759,22 @@
   };
 
   function renderClearRangePodContent() {
-    const clearTimeContainer = document.getElementById('metricClearTime');
+    const centralEl = document.getElementById('metricClearCentral');
+    const boundsEl = document.getElementById('metricClearBounds');
+    if (!centralEl || !boundsEl) return;
+
     if (!lastCalculatedClearData.hasResult) {
-      clearTimeContainer.innerHTML = `<span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">—</span>`;
+      centralEl.textContent = '—';
+      boundsEl.textContent = '—';
       return;
     }
 
     if (clearRangeDisplayMode === 'time') {
-      clearTimeContainer.innerHTML = `
-        <span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">${lastCalculatedClearData.clearTimeStr}</span>
-      `;
+      centralEl.textContent = lastCalculatedClearData.centralTimeStr;
+      boundsEl.textContent = lastCalculatedClearData.boundsTimeStr;
     } else {
-      clearTimeContainer.innerHTML = `
-        <span class="block text-xs sm:text-sm font-black text-emerald-400 tracking-tight leading-tight">${lastCalculatedClearData.durationStr}</span>
-      `;
+      centralEl.textContent = lastCalculatedClearData.centralDurationStr;
+      boundsEl.textContent = lastCalculatedClearData.boundsDurationStr;
     }
   }
 
@@ -822,30 +837,34 @@
     document.getElementById('metricPeakBounds').textContent = `(${peakLowBound.toFixed(3)}% – ${peakHighBound.toFixed(3)}%)`;
 
     const zeroMinuteUpper = findFirstZeroAfterLastFinish(upper.samples, lastFinish);
+    const zeroMinuteCentral = findFirstZeroAfterLastFinish(central.samples, lastFinish);
     const zeroMinuteLower = findFirstZeroAfterLastFinish(lower.samples, lastFinish);
 
-    if (zeroMinuteUpper === null || zeroMinuteLower === null) {
+    if (zeroMinuteUpper === null || zeroMinuteCentral === null || zeroMinuteLower === null) {
       lastCalculatedClearData = {
         hasResult: true,
-        durationStr: '>36h range',
-        clearTimeStr: '>36h range'
+        centralTimeStr: '>36h',
+        boundsTimeStr: '(>36h range)',
+        centralDurationStr: '>36h',
+        boundsDurationStr: '(>36h range)'
       };
     } else {
+      const centralDiffMins = zeroMinuteCentral - firstStart;
       const fastDiffMins = zeroMinuteLower - firstStart;
       const slowDiffMins = zeroMinuteUpper - firstStart;
-      
-      const fastHrs = Math.floor(fastDiffMins / 60);
-      const fastMins = fastDiffMins % 60;
-      const slowHrs = Math.floor(slowDiffMins / 60);
-      const slowMins = slowDiffMins % 60;
 
-      const durationStr = `${fastHrs}h ${fastMins}m – ${slowHrs}h ${slowMins}m`;
-      const clearTimeStr = `${formatTimeFromMinutes(zeroMinuteLower)} – ${formatTimeFromMinutes(zeroMinuteUpper)}`;
+      const centralDurationStr = formatDurationMinutes(centralDiffMins);
+      const boundsDurationStr = `(${formatDurationMinutes(fastDiffMins)} – ${formatDurationMinutes(slowDiffMins)})`;
+
+      const centralTimeStr = formatTimeFromMinutes(zeroMinuteCentral);
+      const boundsTimeStr = `(${formatTimeFromMinutes(zeroMinuteLower)} – ${formatTimeFromMinutes(zeroMinuteUpper)})`;
       
       lastCalculatedClearData = {
         hasResult: true,
-        durationStr,
-        clearTimeStr
+        centralTimeStr,
+        boundsTimeStr,
+        centralDurationStr,
+        boundsDurationStr
       };
     }
 
@@ -1012,6 +1031,30 @@
 
     // Initialize legend values directly to the exact peak values of each respective curve to match the pod
     updateLegendValues(peakHighBound, peakCentral, peakLowBound);
+
+    // Automatically trigger the vertical time marker and tooltip at the central curve's peak index upon initial render
+    if (centralSamples && centralSamples.length > 0) {
+      let maxBac = -1;
+      let peakIndex = 0;
+      centralSamples.forEach((s, idx) => {
+        if (s.bac > maxBac) {
+          maxBac = s.bac;
+          peakIndex = idx;
+        }
+      });
+
+      if (bacChartInstance && bacChartInstance.data.datasets[1].data[peakIndex] !== undefined) {
+        const meta = bacChartInstance.getDatasetMeta(1);
+        const point = meta.data[peakIndex];
+        if (point) {
+          bacChartInstance.setActiveElements([{ datasetIndex: 1, index: peakIndex }]);
+          if (bacChartInstance.tooltip) {
+            bacChartInstance.tooltip.setActiveElements([{ datasetIndex: 1, index: peakIndex }], { x: point.x, y: point.y });
+          }
+          bacChartInstance.update();
+        }
+      }
+    }
   }
 
   window.addDrinkRow = addDrinkRow;
