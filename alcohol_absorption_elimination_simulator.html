@@ -259,6 +259,25 @@
   const MAX_SIMULATION_HOURS_AFTER_LAST_FINISH = 36;
   const BAC_ZERO_THRESHOLD = 0.00001;
 
+  // Debug time override helper supporting ?time=HH:MM or ?time=YYYY-MM-DDTHH:MM:SS
+  function getCurTime() {
+    const params = new URLSearchParams(window.location.search);
+    const timeParam = params.get('time') || params.get('debugTime');
+    if (timeParam) {
+      if (/^\d{2}:\d{2}$/.test(timeParam)) {
+        const [h, m] = timeParam.split(':').map(Number);
+        const d = new Date();
+        d.setHours(h, m, 0, 0);
+        return d;
+      }
+      const parsed = new Date(timeParam);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    return new Date();
+  }
+
   let clearRangeDisplayMode = 'time';
   let lastCalculatedClearData = {
     hasResult: false,
@@ -404,7 +423,7 @@
       row._prevStartIso = newStart.toISOString();
       row._prevFinishIso = newFinish.toISOString();
     } else {
-      const now = new Date();
+      const now = getCurTime();
       const newStart = dateFromTimeStr(now, startInput.value);
       const newFinish = new Date(newStart.getTime() + 30 * 60000);
       finishInput.value = formatTimeHHMM(newFinish);
@@ -422,9 +441,9 @@
     const finishInput = row.querySelector('.drink-finish');
 
     if (startInput && finishInput && startInput.value && finishInput.value) {
-      const now = new Date();
-      const sDate = dateFromTimeStr(now, startInput.value);
-      let fDate = dateFromTimeStr(now, finishInput.value);
+      const baseDate = row._prevStartIso ? new Date(row._prevStartIso) : getCurTime();
+      const sDate = dateFromTimeStr(baseDate, startInput.value);
+      let fDate = dateFromTimeStr(baseDate, finishInput.value);
       if (fDate < sDate) {
         fDate.setDate(fDate.getDate() + 1);
       }
@@ -435,7 +454,7 @@
   }
 
   function addDrinkRow(mode = 'plan', customData = {}) {
-    const now = new Date();
+    const now = getCurTime();
     const rows = [...document.querySelectorAll('#drinksListContainer > div')];
     
     const activePreset = presets[selectedPresetKey] || DEFAULT_PRESETS.craft_beer;
@@ -443,7 +462,8 @@
     let defaultVolume = customData.volume ?? activePreset.volume;
     let defaultAbv = customData.abv ?? activePreset.abv;
     let defaultPresetName = customData.presetName ?? activePreset.label;
-    let lastDurationMinutes = 30;
+    let lastDurationMs = 30 * 60000;
+    let baseStartDate = new Date(now);
 
     if (mode === 'clone' && customData.sourceRowId) {
       const sourceRow = document.getElementById(`drinkRow_${customData.sourceRowId}`);
@@ -453,13 +473,12 @@
         defaultVolume = Number(sourceRow.querySelector('.drink-vol').value) || defaultVolume;
         defaultAbv = Number(sourceRow.querySelector('.drink-abv').value) || defaultAbv;
         defaultPresetName = sourceRow.querySelector('.drink-name').value || defaultPresetName;
+        if (sourceRow._prevStartIso) baseStartDate = new Date(sourceRow._prevStartIso);
       }
     } else {
       if (rows.length > 0) {
         if (mode === 'plan') {
           let latestFinishDate = null;
-          let lastDurationMs = 30 * 60000;
-
           rows.forEach(row => {
             if (row._prevStartIso && row._prevFinishIso) {
               const sDate = new Date(row._prevStartIso);
@@ -471,38 +490,28 @@
               }
             }
           });
-
-          lastDurationMinutes = Math.round(lastDurationMs / 60000);
-          const startDate = latestFinishDate ? new Date(latestFinishDate) : new Date(now);
-          const finishDate = new Date(startDate.getTime() + lastDurationMs);
-
-          defaultStart = formatTimeHHMM(startDate);
-          defaultFinish = formatTimeHHMM(finishDate);
+          if (latestFinishDate) {
+            baseStartDate = new Date(latestFinishDate);
+          }
         } else {
-          const startDate = new Date(now);
-          const finishDate = new Date(startDate.getTime() + 30 * 60000);
-          defaultStart = formatTimeHHMM(startDate);
-          defaultFinish = formatTimeHHMM(finishDate);
+          baseStartDate = new Date(now);
         }
       } else {
-        const startDate = new Date(now);
-        const finishDate = new Date(startDate.getTime() + 30 * 60000);
-        defaultStart = formatTimeHHMM(startDate);
-        defaultFinish = formatTimeHHMM(finishDate);
+        baseStartDate = new Date(now);
       }
     }
+
+    const finishDate = new Date(baseStartDate.getTime() + lastDurationMs);
+    defaultStart = formatTimeHHMM(baseStartDate);
+    defaultFinish = formatTimeHHMM(finishDate);
 
     drinkCounter++;
     const id = drinkCounter;
     const card = document.createElement('div');
     card.id = `drinkRow_${id}`;
     
-    const initNow = new Date();
-    const initS = dateFromTimeStr(initNow, defaultStart);
-    const initF = dateFromTimeStr(initNow, defaultFinish);
-    if (initF < initS) initF.setDate(initF.getDate() + 1);
-    card._prevStartIso = initS.toISOString();
-    card._prevFinishIso = initF.toISOString();
+    card._prevStartIso = baseStartDate.toISOString();
+    card._prevFinishIso = finishDate.toISOString();
 
     card.className = "bg-slate-900 border border-slate-700/80 rounded-xl p-3 transition shadow-sm";
     
@@ -592,15 +601,15 @@
       if (row._prevStartIso && row._prevFinishIso) {
         startDate = new Date(row._prevStartIso);
         finishDate = new Date(row._prevFinishIso);
-        const baseNow = new Date();
-        const sTime = dateFromTimeStr(baseNow, startValue);
-        let fTime = dateFromTimeStr(baseNow, finishValue);
+        const baseDate = new Date(startDate);
+        const sTime = dateFromTimeStr(baseDate, startValue);
+        let fTime = dateFromTimeStr(baseDate, finishValue);
         if (fTime < sTime) fTime.setDate(fTime.getDate() + 1);
         startDate.setHours(sTime.getHours(), sTime.getMinutes(), 0, 0);
         finishDate.setHours(fTime.getHours(), fTime.getMinutes(), 0, 0);
         if (finishDate < startDate) finishDate.setDate(finishDate.getDate() + 1);
       } else {
-        const now = new Date();
+        const now = getCurTime();
         startDate = dateFromTimeStr(now, startValue);
         finishDate = dateFromTimeStr(now, finishValue);
         if (finishDate < startDate) finishDate.setDate(finishDate.getDate() + 1);
@@ -1139,6 +1148,7 @@
     loadPresets();
     document.getElementById('bodyWeight').addEventListener('input', updateCalculations);
     document.getElementById('genderFactor').addEventListener('change', updateCalculations);
+    addDrinkRow('now');
     updateCalculations();
   });
 </script>
